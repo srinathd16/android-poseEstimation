@@ -2,7 +2,7 @@
 # documentation: https://d.android.com/studio/projects/add-native-code.html
 
 set(pathToProject /media/sda5/Courses/F17/MSA/PA2/eee598-poseestimation-sakalabattula-konda-dasari)
-set(pathToProject /home/srinathd/Desktop/OpenCV-android-sdk)
+set(pathToOpenCv /home/srinathd/Desktop/OpenCV-android-sdk)
 # Sets the minimum version of CMake required to build the native library.
 
 cmake_minimum_required(VERSION 3.4.1)
