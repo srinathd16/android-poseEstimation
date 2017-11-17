@@ -28,8 +28,7 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
 
     //__android_log_print(ANDROID_LOG_INFO, "YUV Mat", "Mat= %s", mYuv);
 
-//    __android_log_print(ANDROID_LOG_INFO, "Pixels", "pixels[]= %d", printInt++);
-
+    __android_log_print(ANDROID_LOG_INFO, "mYUV", "rows = %d\tcolumns = %d", mYuv.rows, mYuv.cols);
 
     return env->NewStringUTF(hello.c_str());
 }
