@@ -15,6 +15,10 @@
 #include <opencv2/core/utility.hpp>
 #include <opencv2/highgui.hpp>
 
+
+
+#define BILLION 1000000000L
+
 using namespace cv;
 using namespace std;
 
@@ -50,7 +54,6 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
     bool end_registration = false;
 
 
-
 // Setup the points to register in the image
 // In the order of the *.ply file and starting at 1
     int n = 8;
@@ -59,8 +62,6 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
 
 
     int numKeyPoints = 10000;
-
-
 
 //computation of key points and descriptors for the ref Image
     vector<KeyPoint> keypoints_model;
@@ -101,25 +102,53 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
     std::string returnValue = "hello";
     // TODO
 
+    //Compute code execution time
+    struct timeval start, end;
+    long long elapsed_time;
+
     env->ReleaseStringUTFChars(path_, path);
     __android_log_print(ANDROID_LOG_INFO, "mYUV", "rows");
 
     //Computation of key points and descriptors for the frame
     vector<KeyPoint> keypoints_frame;
     cv::Ptr<cv::FeatureDetector> detector_;
-    detector_ = cv::ORB::create();
+    detector_ = cv::ORB::create(100);
 
     uint8_t *srcLumaPtr = reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(srcBuffer));
 
     Mat mYuv(jHeight + jHeight / 2, jWidth, CV_8UC1, srcLumaPtr);
+  //  Mat mYuv;
+/*
+    int x=0;
+    for(int i=0; i<=jHeight; i+2) {
+        mYuv.row(x) = mYuv_temp.row(i);
+        x++;
+    }
+    x=0;
+    for(int i=0; i<=jWidth; i+2) {
+        mYuv.col(x) = mYuv.col(i);
+        x++;
+    }
+*/
 
+    gettimeofday(&start, NULL);
     detector_->detect(mYuv, keypoints_frame);
+    __android_log_print(ANDROID_LOG_INFO, "mYUV", "rows = %d\tcolumns = %d", mYuv.rows, mYuv.cols);
+    gettimeofday(&end, NULL);
+    elapsed_time = ((end.tv_sec * 1000) + (end.tv_usec / 1000))-((start.tv_sec * 1000) + (start.tv_usec / 1000));
+    __android_log_print(ANDROID_LOG_INFO, "FrameTime", "detector: %lld", elapsed_time);
 
     Mat descriptors_frame;
 
+    gettimeofday(&start, NULL);
     cv::Ptr<cv::DescriptorExtractor> extractor_;
     extractor_ = cv::ORB::create();
+
     extractor_->compute(mYuv, keypoints_frame, descriptors_frame);
+
+    gettimeofday(&end, NULL);
+    elapsed_time = ((end.tv_sec * 1000) + (end.tv_usec / 1000))-((start.tv_sec * 1000) + (start.tv_usec / 1000));
+    __android_log_print(ANDROID_LOG_INFO, "FrameTime", "extractor: %lld", elapsed_time);
 
 // getting good matches between refImage and Input Frame
     cv::Ptr<cv::DescriptorMatcher> matcher_;
@@ -146,7 +175,6 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
         list_points3d_model_match.push_back(point3d_model);                                      // add 3D point
         list_points2d_scene_match.push_back(point2d_scene);                                      // add 2D point
     }
-
 
 //Pose Estimation
     // Intrinsic camera parameters: UVC WEBCAM
@@ -188,9 +216,12 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
     float reprojectionError = 2.0;  // maximum allowed distance to consider it an inlier.
     double confidence = 0.95;        // ransac successful confidence.
     Mat inliers;
-    cv::solvePnPRansac( list_points3d_model_match, list_points2d_scene_match, _A_matrix, distCoeffs, rvec, tvec,
-                        useExtrinsicGuess, iterationsCount, reprojectionError, confidence,
-                        inliers, pnpMethod );
+
+    //cv::solvePnPRansac( list_points3d_model_match, list_points2d_scene_match, _A_matrix, distCoeffs, rvec, tvec,
+    //                    useExtrinsicGuess, iterationsCount, reprojectionError, confidence,
+    //                    inliers, pnpMethod );
+    cv::solvePnP( list_points3d_model_match, list_points2d_scene_match, _A_matrix, distCoeffs, rvec, tvec,
+                  useExtrinsicGuess, pnpMethod);
 
     Rodrigues(rvec,_R_matrix);      // converts Rotation Vector to Matrix
     _t_matrix = tvec;       // set translation matrix
@@ -214,6 +245,11 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
     pMatrix = _P_matrix;
 
     __android_log_print(ANDROID_LOG_INFO, "PFrame", "rows: %f", _P_matrix.at<double>(2,0));
+
+    cv::Point2f p1 (500,400);
+    cv::Point2f p2 (100,200);
+    cv::Scalar red(0,0,255);
+    cv::line(mYuv, p1, p2, red, 3);
 
 
     return env->NewStringUTF(returnValue.c_str());
