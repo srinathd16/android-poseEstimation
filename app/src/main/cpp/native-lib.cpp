@@ -25,6 +25,36 @@ using namespace std;
 Mat global_descriptors_model;
 vector<Point3f> global_list_points3d_model;
 
+Mat _R_matrix;
+Mat _A_matrix;
+Mat _t_matrix;
+Mat _P_matrix;
+
+class pnpProblem{
+
+public:
+
+    Point2f backproject3DPoint(Point3f point3d){
+        // 3D point vector [x y z 1]'
+        cv::Mat point3d_vec = cv::Mat(4, 1, CV_64FC1);
+        point3d_vec.at<double>(0) = point3d.x;
+        point3d_vec.at<double>(1) = point3d.y;
+        point3d_vec.at<double>(2) = point3d.z;
+        point3d_vec.at<double>(3) = 1;
+
+        // 2D point vector [u v 1]'
+        cv::Mat point2d_vec = cv::Mat(4, 1, CV_64FC1);
+        point2d_vec = _A_matrix * _P_matrix * point3d_vec;
+
+        // Normalization of [u v]'
+        cv::Point2f point2d;
+        point2d.x = (float)(point2d_vec.at<double>(0) / point2d_vec.at<double>(2));
+        point2d.y = (float)(point2d_vec.at<double>(1) / point2d_vec.at<double>(2));
+
+        return point2d;
+    }
+};
+
 extern "C" {
 
 JNIEXPORT jstring JNICALL
@@ -96,7 +126,7 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
 JNIEXPORT jstring JNICALL
 Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_Camera2BasicFragment_processCamera2Frames(
         JNIEnv *env, jclass type, jint jWidth, jint jHeight, jobject srcBuffer, jobject dst,
-        jstring path_, jlong PMatrixAddr) {
+        jstring path_, jlong point2fAddr) {
     const char *path = env->GetStringUTFChars(path_, 0);
 
     std::string returnValue = "hello";
@@ -107,7 +137,6 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
     long long elapsed_time;
 
     env->ReleaseStringUTFChars(path_, path);
-    __android_log_print(ANDROID_LOG_INFO, "mYUV", "rows");
 
     //Computation of key points and descriptors for the frame
     vector<KeyPoint> keypoints_frame;
@@ -117,6 +146,9 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
     uint8_t *srcLumaPtr = reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(srcBuffer));
 
     Mat mYuv(jHeight + jHeight / 2, jWidth, CV_8UC1, srcLumaPtr);
+
+    //Mat& mYuvTemp =  *(Mat*) mYuvAddr;
+    //mYuvTemp = mYuv;
   //  Mat mYuv;
 /*
     int x=0;
@@ -176,6 +208,29 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
         list_points2d_scene_match.push_back(point2d_scene);                                      // add 2D point
     }
 
+//Ratio-Test
+    int removed = 0;
+    // for all matches
+    for ( std::vector<std::vector<cv::DMatch> >::iterator
+                  matchIterator= matches.begin(); matchIterator!= matches.end(); ++matchIterator)
+    {
+        // if 2 NN has been identified
+        if (matchIterator->size() > 1)
+        {
+            // check distance ratio
+            if ((*matchIterator)[0].distance / (*matchIterator)[1].distance > 0.8f)
+            {
+                matchIterator->clear(); // remove match
+                removed++;
+            }
+        }
+        else
+        { // does not have 2 neighbours
+            matchIterator->clear(); // remove match
+            removed++;
+        }
+    }
+
 //Pose Estimation
     // Intrinsic camera parameters: UVC WEBCAM
     double f = 45; // focal length in mm
@@ -186,10 +241,7 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
                         width/2,      // cx
                         height/2};    // cy
 
-    Mat _R_matrix;
-    Mat _A_matrix;
-    Mat _t_matrix;
-    Mat _P_matrix;
+
 
     _A_matrix = cv::Mat::zeros(3, 3, CV_64FC1);   // intrinsic camera parameters
     _A_matrix.at<double>(0, 0) = params[0];       //      [ fx   0  cx ]
@@ -217,42 +269,67 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
     double confidence = 0.95;        // ransac successful confidence.
     Mat inliers;
 
-    //cv::solvePnPRansac( list_points3d_model_match, list_points2d_scene_match, _A_matrix, distCoeffs, rvec, tvec,
-    //                    useExtrinsicGuess, iterationsCount, reprojectionError, confidence,
-    //                    inliers, pnpMethod );
-    cv::solvePnP( list_points3d_model_match, list_points2d_scene_match, _A_matrix, distCoeffs, rvec, tvec,
-                  useExtrinsicGuess, pnpMethod);
+    if(good_matches.size() > 0) {
+        cv::solvePnPRansac( list_points3d_model_match, list_points2d_scene_match, _A_matrix, distCoeffs, rvec, tvec,
+                            useExtrinsicGuess, iterationsCount, reprojectionError, confidence,
+                            inliers, pnpMethod );
+        //cv::solvePnP(list_points3d_model_match, list_points2d_scene_match, _A_matrix, distCoeffs,
+        //             rvec, tvec,
+        //             useExtrinsicGuess, pnpMethod);
 
-    Rodrigues(rvec,_R_matrix);      // converts Rotation Vector to Matrix
-    _t_matrix = tvec;       // set translation matrix
+        Rodrigues(rvec, _R_matrix);      // converts Rotation Vector to Matrix
+        _t_matrix = tvec;       // set translation matrix
 
 
-    // Rotation-Translation Matrix Definition
-    _P_matrix.at<double>(0,0) = _R_matrix.at<double>(0,0);
-    _P_matrix.at<double>(0,1) = _R_matrix.at<double>(0,1);
-    _P_matrix.at<double>(0,2) = _R_matrix.at<double>(0,2);
-    _P_matrix.at<double>(1,0) = _R_matrix.at<double>(1,0);
-    _P_matrix.at<double>(1,1) = _R_matrix.at<double>(1,1);
-    _P_matrix.at<double>(1,2) = _R_matrix.at<double>(1,2);
-    _P_matrix.at<double>(2,0) = _R_matrix.at<double>(2,0);
-    _P_matrix.at<double>(2,1) = _R_matrix.at<double>(2,1);
-    _P_matrix.at<double>(2,2) = _R_matrix.at<double>(2,2);
-    _P_matrix.at<double>(0,3) = _t_matrix.at<double>(0);
-    _P_matrix.at<double>(1,3) = _t_matrix.at<double>(1);
-    _P_matrix.at<double>(2,3) = _t_matrix.at<double>(2);
+        // Rotation-Translation Matrix Definition
+        _P_matrix.at<double>(0, 0) = _R_matrix.at<double>(0, 0);
+        _P_matrix.at<double>(0, 1) = _R_matrix.at<double>(0, 1);
+        _P_matrix.at<double>(0, 2) = _R_matrix.at<double>(0, 2);
+        _P_matrix.at<double>(1, 0) = _R_matrix.at<double>(1, 0);
+        _P_matrix.at<double>(1, 1) = _R_matrix.at<double>(1, 1);
+        _P_matrix.at<double>(1, 2) = _R_matrix.at<double>(1, 2);
+        _P_matrix.at<double>(2, 0) = _R_matrix.at<double>(2, 0);
+        _P_matrix.at<double>(2, 1) = _R_matrix.at<double>(2, 1);
+        _P_matrix.at<double>(2, 2) = _R_matrix.at<double>(2, 2);
+        _P_matrix.at<double>(0, 3) = _t_matrix.at<double>(0);
+        _P_matrix.at<double>(1, 3) = _t_matrix.at<double>(1);
+        _P_matrix.at<double>(2, 3) = _t_matrix.at<double>(2);
 
-    Mat& pMatrix =  *(Mat*) PMatrixAddr;
-    pMatrix = _P_matrix;
+        //Mat &pMatrix = *(Mat *) PMatrixAddr;
+        //pMatrix = _P_matrix;
 
-    __android_log_print(ANDROID_LOG_INFO, "PFrame", "rows: %f", _P_matrix.at<double>(2,0));
+        __android_log_print(ANDROID_LOG_INFO, "PFrame", "rows: %f", _P_matrix.at<double>(2, 0));
 
-    cv::Point2f p1 (500,400);
-    cv::Point2f p2 (100,200);
-    cv::Scalar red(0,0,255);
-    cv::line(mYuv, p1, p2, red, 3);
+        float l = 200;
 
+        Mat &pose_pointsMat_temp = *(Mat *) point2fAddr;
+
+        vector<Point2f> pose_points2d;
+        pnpProblem pnp_detection_est;
+        pose_points2d.push_back(
+                pnp_detection_est.backproject3DPoint(Point3f(0, 0, 0)));  // axis center
+        pose_points2d.push_back(pnp_detection_est.backproject3DPoint(Point3f(l, 0, 0)));  // axis x
+        pose_points2d.push_back(pnp_detection_est.backproject3DPoint(Point3f(0, l, 0)));  // axis y
+        pose_points2d.push_back(pnp_detection_est.backproject3DPoint(Point3f(0, 0, l)));  // axis z
+        pose_points2d.push_back(pnp_detection_est.backproject3DPoint(
+                Point3f(1.4 * l, 1.4 * l, 0)));  // diagonal x-y
+        pose_points2d.push_back(
+                pnp_detection_est.backproject3DPoint(Point3f(l, 0, l)));  // 3d point-x
+        pose_points2d.push_back(
+                pnp_detection_est.backproject3DPoint(Point3f(0, l, l)));  // 3d point-y
+        pose_points2d.push_back(
+                pnp_detection_est.backproject3DPoint(Point3f(1.4 * l, 1.4 * l, l)));  // 3d point-diagonal
+
+        Mat pose_pointsMat(pose_points2d);
+
+        pose_pointsMat_temp = pose_pointsMat;
+        __android_log_print(ANDROID_LOG_INFO, "Good_Matches", "size %d",good_matches.size());
+    }
+
+    //__android_log_print(ANDROID_LOG_INFO, "pose_points2d", "size %d",pose_pointsMat_temp.size);
 
     return env->NewStringUTF(returnValue.c_str());
-    //return _P_matrix;
+    //return posePoints;
 }
+
 }
