@@ -74,6 +74,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.opencv.android.Utils;
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
 import java.io.File;
@@ -91,10 +93,20 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import org.opencv.calib3d.Calib3d;
+import org.opencv.core.MatOfPoint2f;
+import org.opencv.core.MatOfPoint3f;
+import org.opencv.core.Point3;
+import org.opencv.core.Scalar;
+import org.opencv.imgproc.Imgproc;
+
+import static org.opencv.core.CvType.CV_64FC1;
+
 
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class Camera2BasicFragment extends Fragment
         implements ActivityCompat.OnRequestPermissionsResultCallback {
+
+    Camera2BasicFragment globalContext;
 //View.OnClickListener,
     /**
      * Conversion from screen rotation to JPEG orientation.
@@ -314,19 +326,61 @@ public class Camera2BasicFragment extends Fragment
             //nativePoseEstimation(tempImage.getHeight(), tempImage.getWidth(), planes[0].getBuffer(), msurface, path, bmp_mat_addr);
 
             //long bmp_mat_addr = 10;
-            Mat javaPMatrix = new Mat();
+            //Mat javaPMatrix = new Mat();
             //javaPMatrix = FrameEstimation(tempImage.getHeight(), tempImage.getWidth(), planes[0].getBuffer(), msurface, path);
             //Log.d("PMATRIX", "Cols: "+javaPMatrix.cols());
 
-
             long current_time = System.currentTimeMillis();
 
-            processCamera2Frames(tempImage.getHeight(), tempImage.getWidth(), planes[0].getBuffer(), msurface, path, javaPMatrix.getNativeObjAddr());
+            Mat posePoints2D = new Mat();
+
+            //Mat javaMyuv = new Mat();
+
+            processCamera2Frames(tempImage.getHeight(), tempImage.getWidth(), planes[0].getBuffer(), msurface, path, posePoints2D.getNativeObjAddr());
 
             long elapsed_time = (System.currentTimeMillis() - current_time);
             String elapsed_time_string = Objects.toString(elapsed_time);
             Log.d("processframes", "Time: "+elapsed_time_string);
-            Log.d("PMATRIX", "Cols: "+javaPMatrix.rows());
+
+            Log.d("posePoints2DMat", "rows: "+posePoints2D.rows()+" cols: "+posePoints2D.cols());
+
+            double[] origin = posePoints2D.get(0,0);
+            double[] x = posePoints2D.get(1,0);
+            double[] y = posePoints2D.get(2,0);
+            double[] z = posePoints2D.get(3,0);
+            double[] diagonal_xy = posePoints2D.get(4,0);
+            double[] x_3d = posePoints2D.get(5,0);
+            double[] y_3d = posePoints2D.get(6,0);
+            double[] diagonal_3d = posePoints2D.get(7,0);
+            Log.d("Origin", "origin: "+origin[0]+ " " + origin[1]);
+            Log.d("DoubleX", "x: "+x[0]+ " " + x[1]);
+
+            //Log.d("mYuvJava", "rows: "+javaMyuv.rows()+ " cols: " + javaMyuv.cols());
+
+            //org.opencv.core.Point p1 = new org.opencv.core.Point();
+            //org.opencv.core.Point p2 = new org.opencv.core.Point();
+            //p1.set(origin);
+            //p2.set(x);
+
+            CustomView customView = new CustomView(globalContext, origin, x, y, z, diagonal_xy, x_3d, y_3d, diagonal_3d);
+
+            //Log.d("mYuvJava", "rows: "+javaMyuv.rows()+ " cols: " + javaMyuv.cols());
+
+            /*
+            Scalar red = new Scalar(0, 0, 255);
+            Imgproc.line(javaMyuv, p1, p2, red, 4);
+            Mat rgbaMat = new Mat();
+            Imgproc.cvtColor(javaMyuv, rgbaMat, Imgproc.COLOR_GRAY2RGBA, 4);
+            Bitmap bitmap = null;
+            bitmap = Bitmap.createBitmap(rgbaMat.cols(), rgbaMat.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(rgbaMat, bitmap);
+            */
+
+            //temp = (MatOfPoint2f) posePoints2D;
+            //Log.d("Point2f", "length: "+temp.size());
+
+
+            //Mat rvec = javaPMatrix.su
 
             //Log.d("PING", "hello");
 
@@ -631,9 +685,12 @@ public class Camera2BasicFragment extends Fragment
 
         processReferenceImage(bmp_mat_addr);
 
+        globalContext = this;
+
         View view = inflater.inflate(R.layout.fragment_camera2_basic, container, false);
 
         LinearLayout surface = view.findViewById(R.id.surface);
+
         surface.addView(new CustomView(this));
 
         return view;
@@ -1265,17 +1322,27 @@ public class Camera2BasicFragment extends Fragment
                                                       //Surface dst, String path, long bmp_addr);
     private static native String processReferenceImage(long bmp_addr);
 
-    private static native String processCamera2Frames(int srcWidth, int srcHeight, ByteBuffer srcBuf, Surface dst, String path, long PMatrixAddr);
+    private static native String processCamera2Frames(int srcWidth, int srcHeight, ByteBuffer srcBuf, Surface dst, String path, long tempAddr);
 }
 
-class CustomView extends SurfaceView {
+class CustomView extends SurfaceView implements SurfaceHolder.Callback{
 
     private final Paint paint;
     private final SurfaceHolder mHolder;
     private final Context context;
+    static double[] point1 = new double[2];
+    static double[] point2 = new double[2];
+    static double[] point3 = new double[2];
+    static double[] point4 = new double[2];
+    static double[] point5 = new double[2];
+    static double[] point6 = new double[2];
+    static double[] point7 = new double[2];
+    static double[] point8 = new double[2];
+
 
     public CustomView(Camera2BasicFragment context) {
         super(context.getActivity().getBaseContext());
+        Log.d("CustomView", "customview");
         mHolder = getHolder();
         setZOrderOnTop(true);
         mHolder.setFormat(PixelFormat.TRANSPARENT);
@@ -1286,17 +1353,105 @@ class CustomView extends SurfaceView {
 
         this.context = context.getActivity().getBaseContext();
         paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        paint.setColor(Color.WHITE);
+        paint.setColor(Color.RED);
         paint.setStyle(Paint.Style.STROKE);
         //setZOrderMediaOverlay(true);
 
         //Calib3d.projectPoints()
+
+        if(getHolder().getSurface() != null){
+            Log.d("Surface", "true");
+        }
+
+        /*
+        //if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            //invalidate();
+            if (mHolder.getSurface().isValid()) {
+                Canvas canvas = mHolder.lockCanvas();
+                Log.d("touch", "touchRecieved by camera");
+                //if (canvas != null) {
+                    Log.d("touch", "touchRecieved CANVAS STILL Not Null");
+                    //canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+                    canvas.drawColor(Color.TRANSPARENT);
+                    canvas.drawCircle(1000, 500, 100, paint);
+                    //canvas.drawLine();
+                    Paint paint = new Paint();
+
+
+                    mHolder.unlockCanvasAndPost(canvas);
+                //}
+                //mHolder.unlockCanvasAndPost(canvas);
+
+
+            //}
+        }*/
+
     }
 
+    public CustomView(Camera2BasicFragment context, double[] origin, double[] x, double[] y, double[] z, double[] diagonal_xy,
+                      double[] x_3d, double[] y_3d, double[] diagonal_3d) {
+        super(context.getActivity().getBaseContext());
+        point1 = origin;
+        point2 = x;
+        point3 = y;
+        point4 = z;
+        point5 = diagonal_xy;
+        point6 = x_3d;
+        point7 = y_3d;
+        point8 = diagonal_3d;
+        //Log.d("PointsInside", "p1: "+point1[0]+" "+point1[1]);
+        Log.d("CustomView", "customview");
+        mHolder = getHolder();
+        setZOrderOnTop(true);
+        mHolder.setFormat(PixelFormat.TRANSPARENT);
+        //mHolder.setFormat(PixelFormat.formatHasAlpha(100));
+        //Log.d("ALPHA", "bool: "+PixelFormat.formatHasAlpha(PixelFormat.TRANSPARENT));
+        PixelFormat.formatHasAlpha(PixelFormat.TRANSPARENT);
+        //mHolder.setFormat(PixelFormat.TRANSLUCENT);
+
+        this.context = context.getActivity().getBaseContext();
+        paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(Color.RED);
+        Log.d("PaintColor", "color1 "+paint.getColor());
+        paint.setStyle(Paint.Style.STROKE);
+        //setZOrderMediaOverlay(true);
+
+        //Calib3d.projectPoints()
+
+        if(getHolder().getSurface().isValid()){
+            Log.d("Surface", "true");
+        }
+
+        /*
+        //if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            //invalidate();
+            if (mHolder.getSurface().isValid()) {
+                Canvas canvas = mHolder.lockCanvas();
+                Log.d("touch", "touchRecieved by camera");
+                //if (canvas != null) {
+                    Log.d("touch", "touchRecieved CANVAS STILL Not Null");
+                    //canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+                    canvas.drawColor(Color.TRANSPARENT);
+                    canvas.drawCircle(1000, 500, 100, paint);
+                    //canvas.drawLine();
+                    Paint paint = new Paint();
+
+
+                    mHolder.unlockCanvasAndPost(canvas);
+                //}
+                //mHolder.unlockCanvasAndPost(canvas);
+
+
+            //}
+        }*/
+
+    }
+/*
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
     }
+*/
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -1309,9 +1464,57 @@ class CustomView extends SurfaceView {
                     Log.d("touch", "touchRecieved CANVAS STILL Not Null");
                     canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
                     canvas.drawColor(Color.TRANSPARENT);
-                    canvas.drawCircle(event.getX(), event.getY(), 100, paint);
+                    //canvas.drawCircle(event.getX(), event.getY(), 100, paint);
+                    Paint paint = new Paint();
+                    paint.setColor(Color.BLUE);
+                    paint.setStrokeWidth(10f);
+
+
+
+                    //point1[0] = 1; point1[1] = 2;
+                    Log.d("Points", "p1: "+point1[0]+" "+point1[1]);
+                    //Log.d("PointsFloat", "p1: "+(float)point1[0]+" "+(float)point1[1]);
+                    /*
+                    if (point1 == null) {
+                        Log.d("Points", "point1: null");
+
+                    }
+                    if (point2 == null) {
+                        Log.d("Points", "point2: null");
+
+                    }
+                    */
+                    //if(point1 != null && point2!=null) {
+                        canvas.drawLine((float) point1[0], (float) point1[1], (float) point2[0], (float) point2[1], paint);
+                    canvas.drawLine((float) point2[0], (float) point2[1], (float) point5[0], (float) point5[1], paint);
+                    canvas.drawLine((float) point5[0], (float) point5[1], (float) point3[0], (float) point3[1], paint);
+                    canvas.drawLine((float) point3[0], (float) point3[1], (float) point1[0], (float) point1[1], paint);
+                    canvas.drawLine((float) point4[0], (float) point4[1], (float) point6[0], (float) point6[1], paint);
+                    canvas.drawLine((float) point6[0], (float) point6[1], (float) point8[0], (float) point8[1], paint);
+                    canvas.drawLine((float) point8[0], (float) point8[1], (float) point7[0], (float) point7[1], paint);
+                    canvas.drawLine((float) point7[0], (float) point7[1], (float) point4[0], (float) point4[1], paint);
+                    canvas.drawLine((float) point3[0], (float) point3[1], (float) point7[0], (float) point7[1], paint);
+                    canvas.drawLine((float) point1[0], (float) point1[1], (float) point4[0], (float) point4[1], paint);
+                    canvas.drawLine((float) point2[0], (float) point2[1], (float) point6[0], (float) point6[1], paint);
+                    canvas.drawLine((float) point5[0], (float) point5[1], (float) point8[0], (float) point8[1], paint);
+/*
+                    canvas.drawLine((float) point1[0], (float) point2[0], (float) point1[1], (float) point2[1], paint);
+                    canvas.drawLine((float) point2[0], (float) point5[0], (float) point2[1], (float) point5[1], paint);
+                    canvas.drawLine((float) point5[0], (float) point3[0], (float) point5[1], (float) point3[1], paint);
+                    canvas.drawLine((float) point3[0], (float) point1[0], (float) point3[1], (float) point1[1], paint);
+                    canvas.drawLine((float) point4[0], (float) point6[0], (float) point4[1], (float) point6[1], paint);
+                    canvas.drawLine((float) point6[0], (float) point8[0], (float) point6[1], (float) point8[1], paint);
+                    canvas.drawLine((float) point8[0], (float) point7[0], (float) point8[1], (float) point7[1], paint);
+                    canvas.drawLine((float) point7[0], (float) point4[0], (float) point7[1], (float) point4[1], paint);
+                    canvas.drawLine((float) point3[0], (float) point7[0], (float) point3[1], (float) point7[1], paint);
+                    canvas.drawLine((float) point1[0], (float) point4[0], (float) point1[1], (float) point4[1], paint);
+                    canvas.drawLine((float) point2[0], (float) point6[0], (float) point2[1], (float) point6[1], paint);
+                    canvas.drawLine((float) point5[0], (float) point8[0], (float) point5[1], (float) point8[1], paint);
+*/
+                    //}
 
                     mHolder.unlockCanvasAndPost(canvas);
+/*
                     new Handler().postDelayed(new Runnable() {
                         @Override
                         public void run() {
@@ -1323,7 +1526,7 @@ class CustomView extends SurfaceView {
 
                         }
                     }, 1000);
-
+*/
                 }
                 //mHolder.unlockCanvasAndPost(canvas);
 
@@ -1333,5 +1536,22 @@ class CustomView extends SurfaceView {
 
 
         return false;
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder surfaceHolder) {
+        if((getHolder().lockCanvas() != null)){
+            Log.d("Canvas", "true");
+        }
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder surfaceHolder, int i, int i1, int i2) {
+
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder surfaceHolder) {
+
     }
 }
