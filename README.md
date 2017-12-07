@@ -11,7 +11,7 @@ Prerequisites
     -eee598-poseestimation-sakalabattula-konda-dasari
   
   How to use the app
-    -After installing the app for the cube to be displayed we need to touch on the display screen multiple times since we used onTouch function as part of our onPose function.
+    -Post installation of the app for the cube to be displayed we need to touch on the display screen multiple times since we used onTouch function as part of our onPose function.
     
    Expected Output
     -Cube will be displayed sporadically and the size of the cube is also distorted.
