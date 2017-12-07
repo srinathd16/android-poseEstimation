@@ -52,6 +52,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
@@ -101,27 +102,18 @@ import org.opencv.imgproc.Imgproc;
 
 import static org.opencv.core.CvType.CV_64FC1;
 
+/**This file/class is called by Camera2BasicFragment.java
+ * Includes the class Camera2BasicFragment, containing calls to functions that implement various operations on Camera to be used for the achieving Augmented Reality.
+ */
 
 @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
 public class Camera2BasicFragment extends Fragment
         implements ActivityCompat.OnRequestPermissionsResultCallback {
 
     Camera2BasicFragment globalContext;
-//View.OnClickListener,
-    /**
-     * Conversion from screen rotation to JPEG orientation.
-     */
-//    private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
+	
     private static final int REQUEST_CAMERA_PERMISSION = 1;
     private static final String FRAGMENT_DIALOG = "dialog";
-/*
-    static {
-        ORIENTATIONS.append(Surface.ROTATION_0, 90);
-        ORIENTATIONS.append(Surface.ROTATION_90, 0);
-        ORIENTATIONS.append(Surface.ROTATION_180, 270);
-        ORIENTATIONS.append(Surface.ROTATION_270, 180);
-    }
-*/
     /**
      * Tag for the {@link Log}.
      */
@@ -131,26 +123,6 @@ public class Camera2BasicFragment extends Fragment
      * Camera state: Showing camera preview.
      */
     private static final int STATE_PREVIEW = 0;
-
-    /**
-     * Camera state: Waiting for the focus to be locked.
-     */
-//    private static final int STATE_WAITING_LOCK = 1;
-
-    /**
-     * Camera state: Waiting for the exposure to be precapture state.
-     */
-//    private static final int STATE_WAITING_PRECAPTURE = 2;
-
-    /**
-     * Camera state: Waiting for the exposure state to be something other than precapture.
-     */
-//    private static final int STATE_WAITING_NON_PRECAPTURE = 3;
-
-    /**
-     * Camera state: Picture was taken.
-     */
-//    private static final int STATE_PICTURE_TAKEN = 4;
 
     /**
      * Max preview width that is guaranteed by Camera2 API
@@ -163,8 +135,11 @@ public class Camera2BasicFragment extends Fragment
     private static final int MAX_PREVIEW_HEIGHT = 1080;
 
     /**
-     * {@link TextureView.SurfaceTextureListener} handles several lifecycle events on a
-     * {@link TextureView}.
+     * The listener can be used to notify when the surface texure associated with the texture view is available.
+	 * onSurfaceTextureAvailable - Invoked when the surface texture is ready for use.
+	 * onSurfaceTextureSizeChanged - Invoked when the size of the buffer is changed.
+	 * onSurfaceTextureDestroyed - Called when the surface texture is about to be destroyed. If it is true there should be no further rendering, if false it should call release function.
+	 * onSurfaceTextureUpdated - Invoked when the surface texture is updated.
      */
     private final TextureView.SurfaceTextureListener mSurfaceTextureListener
             = new TextureView.SurfaceTextureListener() {
@@ -191,39 +166,42 @@ public class Camera2BasicFragment extends Fragment
     };
 
     /**
-     * ID of the current {@link CameraDevice}.
+     * ID of the current cameradevice.
      */
     private String mCameraId;
 
     /**
-     * An {@link AutoFitTextureView} for camera preview.
+     * AutoFitTextureView for camera preview.
      */
     private AutoFitTextureView mTextureView;
 
     /**
-     * A {@link CameraCaptureSession } for camera preview.
+     * CameraCaptureSession for camera preview.
      */
     private CameraCaptureSession mCaptureSession;
 
     /**
-     * A reference to the opened {@link CameraDevice}.
+     * A reference to the opened CameraDevice.
      */
     private CameraDevice mCameraDevice;
 
     /**
-     * The {@link Size} of camera preview.
+     * The Size of camera preview.
      */
     private Size mPreviewSize;
 
     /**
-     * {@link CameraDevice.StateCallback} is called when {@link CameraDevice} changes its state.
+     * CameraDevice.StateCallback is called when CameraDevice changes its state.
+	 * Object for receiving update about the state of a camera device.
+	 * onOpened - This method is called when the camera is opened.  We start camera preview here.
+	 * onDisconnected - This method is called when the camera device is no longer available for use.
+	 * onError - Called when camera device has an error.
      */
 
     private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
 
         @Override
         public void onOpened(@NonNull CameraDevice cameraDevice) {
-            // This method is called when the camera is opened.  We start camera preview here.
             mCameraOpenCloseLock.release();
             mCameraDevice = cameraDevice;
             createCameraPreviewSession();
@@ -255,35 +233,31 @@ public class Camera2BasicFragment extends Fragment
     private HandlerThread mBackgroundThread;
 
     /**
-     * A {@link Handler} for running tasks in the background.
+     * A Handler for running tasks in the background.
      */
     private Handler mBackgroundHandler;
 
     /**
-     * An {@link ImageReader} that handles still image capture.
+     * An ImageReader that handles still image capture.
      */
     private ImageReader mImageReader;
 
     /**
      * This is the output file for our picture.
      */
-/*    private File mFile;
 
     /**
-     * This a callback object for the {@link ImageReader}. "onImageAvailable" will be called when a
+     * This a callback object for the ImageReader. "onImageAvailable" will be called when a
      * still image is ready to be saved.
+	 * onImageAvailable - Callback that is called when a new image is available from ImageReader.
      */
     private final ImageReader.OnImageAvailableListener mOnImageAvailableListener
             = new ImageReader.OnImageAvailableListener() {
 
         @Override
         public void onImageAvailable(ImageReader reader) {
-//EDIT
-            //Log.d("ONIMAGEAVAILABLE", "onImage");
-            //reader = ImageReader.newInstance(mTextureView.getWidth(), mTextureView.getHeight(), ImageFormat.YUV_420_888,1);
-            Image tempImage = reader.acquireNextImage();
-//            mBackgroundHandler.post(new ImageSaver(tempImage, mFile));
 
+            Image tempImage = reader.acquireNextImage();
 
             Mat mLines;
             if (tempImage.getFormat() != ImageFormat.YUV_420_888) {
@@ -293,50 +267,17 @@ public class Camera2BasicFragment extends Fragment
             // Spec guarantees that planes[0] is luma and has pixel stride of 1.
             // It also guarantees that planes[1] and planes[2] have the same row and
             // pixel stride.
-            /*
-            if (planes[1].getPixelStride() != 1 && planes[1].getPixelStride() != 2) {
-                throw new IllegalArgumentException(
-                        "src chroma plane must have a pixel stride of 1 or 2: got "
-                                + planes[1].getPixelStride());
-            }
-            */
             mLines = new Mat();
 
             String path = "/storage/emulated/0/Android/data/com.example.asuforia_augmented_reality/files/";
-            //String path2 =
-//            if(mTextureView.isAvailable()){
-//                Log.d("isavailable","isavailable");
-//            }
 
             Log.d("DIR", "external: " + Environment.getExternalStorageDirectory());
-
-
-            /*
-            BitmapFactory.Options opts = new BitmapFactory.Options();
-            opts.inPreferredConfig = Bitmap.Config.ARGB_8888; // Each pixel is 4 bytes: Alpha, Red, Green, Blue
-            Bitmap bmpIn = BitmapFactory.decodeResource(getResources(), R.drawable.stones, opts);
-            Mat bmp_mat = new Mat();
-            Bitmap bmp32 = bmpIn.copy(Bitmap.Config.ARGB_8888, true);
-            Utils.bitmapToMat(bmp32, bmp_mat);
-            long bmp_mat_addr = bmp_mat.getNativeObjAddr();
-            */
-            //imageView = (ImageView) findViewById(R.id.imageView);
-
-
-            //nativePoseEstimation(tempImage.getHeight(), tempImage.getWidth(), planes[0].getBuffer(), msurface, path, bmp_mat_addr);
-
-            //long bmp_mat_addr = 10;
-            //Mat javaPMatrix = new Mat();
-            //javaPMatrix = FrameEstimation(tempImage.getHeight(), tempImage.getWidth(), planes[0].getBuffer(), msurface, path);
-            //Log.d("PMATRIX", "Cols: "+javaPMatrix.cols());
 
             long current_time = System.currentTimeMillis();
 
             Mat posePoints2D = new Mat();
 
-            //Mat javaMyuv = new Mat();
-
-            processCamera2Frames(tempImage.getHeight(), tempImage.getWidth(), planes[0].getBuffer(), msurface, path, posePoints2D.getNativeObjAddr());
+            nativePoseEstimation(tempImage.getHeight(), tempImage.getWidth(), planes[0].getBuffer(), msurface, path, posePoints2D.getNativeObjAddr());
 
             long elapsed_time = (System.currentTimeMillis() - current_time);
             String elapsed_time_string = Objects.toString(elapsed_time);
@@ -355,233 +296,63 @@ public class Camera2BasicFragment extends Fragment
             Log.d("Origin", "origin: "+origin[0]+ " " + origin[1]);
             Log.d("DoubleX", "x: "+x[0]+ " " + x[1]);
 
-            //Log.d("mYuvJava", "rows: "+javaMyuv.rows()+ " cols: " + javaMyuv.cols());
-
-            //org.opencv.core.Point p1 = new org.opencv.core.Point();
-            //org.opencv.core.Point p2 = new org.opencv.core.Point();
-            //p1.set(origin);
-            //p2.set(x);
-
-            CustomView customView = new CustomView(globalContext, origin, x, y, z, diagonal_xy, x_3d, y_3d, diagonal_3d);
-
-            //Log.d("mYuvJava", "rows: "+javaMyuv.rows()+ " cols: " + javaMyuv.cols());
-
-            /*
-            Scalar red = new Scalar(0, 0, 255);
-            Imgproc.line(javaMyuv, p1, p2, red, 4);
-            Mat rgbaMat = new Mat();
-            Imgproc.cvtColor(javaMyuv, rgbaMat, Imgproc.COLOR_GRAY2RGBA, 4);
-            Bitmap bitmap = null;
-            bitmap = Bitmap.createBitmap(rgbaMat.cols(), rgbaMat.rows(), Bitmap.Config.ARGB_8888);
-            Utils.matToBitmap(rgbaMat, bitmap);
-            */
-
-            //temp = (MatOfPoint2f) posePoints2D;
-            //Log.d("Point2f", "length: "+temp.size());
-
-
-            //Mat rvec = javaPMatrix.su
-
-            //Log.d("PING", "hello");
-
-            //showText(mTextureView);
-            //int yuvHeight = mTextureView.getHeight();
-            //int yuvWidth = mTextureView.getWidth();
-            //Image tempImage = reader.acquireNextImage();
-            //Log.d("Testonimage", "onImage");
-            //stringFromJNI(yuvHeight, yuvWidth, tempImage);
-
-            //tempImage.
-
-
-
-//EDIT      //Read Matrix from Reference Image; if tempImage is reference image
-            //Mat mYuv = Imgcodecs.imread(tempImage_path, color);
-            //Mat mYuv = Imgcodecs.imread(mFile);
+            //onPose onPose = new onPose(globalContext, origin, x, y, z, diagonal_xy, x_3d, y_3d, diagonal_3d);
+			poseListener(globalContext, origin, x, y, z, diagonal_xy, x_3d, y_3d, diagonal_3d);
             tempImage.close();
         }
 
     };
-
-    public void showText(View view){
-        //TextView tv = (TextView) view.findViewById(R.id.sample_text);
-        //tv.setText(stringFromJNI());
+	
+	public void poseListener(Camera2BasicFragment context, double[] origin, double[] x, double[] y, double[] z, double[] diagonal_xy,
+                             double[] x_3d, double[] y_3d, double[] diagonal_3d){
+        onPose onpose = new onPose(context, origin, x, y, z, diagonal_xy, x_3d, y_3d, diagonal_3d);
     }
 
+
     /**
-     * {@link CaptureRequest.Builder} for the camera preview
+     * CaptureRequest.Builder for the camera preview
      */
     private CaptureRequest.Builder mPreviewRequestBuilder;
 
     /**
-     * {@link CaptureRequest} generated by {@link #mPreviewRequestBuilder}
+     * CaptureRequest generated by #mPreviewRequestBuilder
      */
     private CaptureRequest mPreviewRequest;
 
-    //EDIT
     private Surface msurface;
     /**
      * The current state of camera state for taking pictures.
-     *
-     //     * @see #mCaptureCallback
      */
     private int mState = STATE_PREVIEW;
 
     /**
-     * A {@link Semaphore} to prevent the app from exiting before closing the camera.
+     * A Semaphore to prevent the app from exiting before closing the camera.
      */
     private Semaphore mCameraOpenCloseLock = new Semaphore(1);
 
     /**
      * Whether the current camera device supports Flash or not.
      */
-//    private boolean mFlashSupported;
 
     /**
      * Orientation of the camera sensor
      */
     private int mSensorOrientation;
-
-    /**
-     * A {@link CameraCaptureSession.CaptureCallback} that handles events related to JPEG capture.
+	
+	/**
+	 * A CameraCaptureSession.CaptureCallback that handles events related to JPEG capture.
+	 * onCaptureProgressed - Called when an image capture makes partial progress i.e. some results from the image capture are available.
+	 * onCaptureCompleted - Called when the image capture is completed fully 
      */
-
-    private  File getOutputMediaFile(){
-        // To be safe, you should check that the SDCard is mounted
-        // using Environment.getExternalStorageState() before doing this.
-        File mediaStorageDir = new File(Environment.getExternalStorageDirectory()
-                + "/Android/data/"
-                + "/Files");
-
-        // This location works best if you want the created images to be shared
-        // between applications and persist after your app has been uninstalled.
-
-        // Create the storage directory if it does not exist
-        if (! mediaStorageDir.exists()){
-            if (! mediaStorageDir.mkdirs()){
-                return null;
-            }
-        }
-        // Create a media file name
-        String timeStamp = new SimpleDateFormat("ddMMyyyy_HHmm").format(new Date());
-        File mediaFile;
-        String mImageName="MI_"+ timeStamp +".jpg";
-        mediaFile = new File(mediaStorageDir.getPath() + File.separator + mImageName);
-        return mediaFile;
-    }
+	
     private CameraCaptureSession.CaptureCallback mCaptureCallback
             = new CameraCaptureSession.CaptureCallback() {
 
         private void process(CaptureResult result) {
             switch (mState) {
                 case STATE_PREVIEW: {
-                    // We have nothing to do when the camera preview is working normally.
-                    //Log.d("PREVIEW", "preview");
-/*
-                    try {
-                        final Activity activity = getActivity();
-                        if (null == activity || null == mCameraDevice) {
-                            return;
-                        }
-                        // This is the CaptureRequest.Builder that we use to take a picture.
-                        final CaptureRequest.Builder captureBuilder =
-                                mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-                        captureBuilder.addTarget(mImageReader.getSurface());
-
-                        // Use the same AE and AF modes as the preview.
-                        captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                                CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-                        //setAutoFlash(captureBuilder);
-
-                        // Orientation
-                        //int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
-                        //captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(rotation));
-
-                        CameraCaptureSession.CaptureCallback CaptureCallback
-                                = new CameraCaptureSession.CaptureCallback() {
-
-                            @Override
-                            public void onCaptureCompleted(@NonNull CameraCaptureSession session,
-                                                           @NonNull CaptureRequest request,
-                                                           @NonNull TotalCaptureResult result) {
-                                //showToast("Saved: " + mFile);
-                                //Log.d(TAG, mFile.toString());
-                                //unlockFocus();
-                            }
-                        };
-
-                        //mCaptureSession.stopRepeating();
-                        //mCaptureSession.abortCaptures();
-                        mCaptureSession.capture(captureBuilder.build(), CaptureCallback, null);
-                    } catch (CameraAccessException e) {
-                        e.printStackTrace();
-                    }
-*/
-                    //mImageReader.setOnImageAvailableListener(mOnImageAvailableListener,mBackgroundHandler);
-                    //ImageReader reader = ImageReader.newInstance(mTextureView.getWidth(), mTextureView.getHeight(), ImageFormat.YUV_420_888,5);
-                    //Image testImage = mImageReader.acquireNextImage();
-                    //ImageSaver is = new ImageSaver(reader.acquireNextImage(), mFile);
-                    //is.run();
-                    //Image testImage = is.mImage;
-                    //Log.d("Dimensions", "height:"+ testImage.getHeight()+"  width: "+testImage.getWidth()+" format: "+testImage.getFormat());
-                    /*ByteBuffer buffer = testImage.getPlanes()[0].getBuffer();
-                    byte[] bytes = new byte[buffer.capacity()];
-                    buffer.get(bytes);
-                    Bitmap bitmapImage = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, null);
-                    File pictureFile = getOutputMediaFile();
-                    if (pictureFile == null) {
-                        Log.d(TAG,
-                                "Error creating media file, check storage permissions: ");// e.getMessage());
-                        return;
-                    }
-                    try {
-                        FileOutputStream fos = new FileOutputStream(pictureFile);
-                        bitmapImage.compress(Bitmap.CompressFormat.PNG, 90, fos);
-                        fos.close();
-                    } catch (FileNotFoundException e) {
-                        Log.d(TAG, "File not found: " + e.getMessage());
-                    } catch (IOException e) {
-                        Log.d(TAG, "Error accessing file: " + e.getMessage());
-                    }*/
                     break;
                 }
-                /*case STATE_WAITING_LOCK: {
-                    Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
-                    if (afState == null) {
-//                        captureStillPicture();
-                    } else if (CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED == afState ||
-                            CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED == afState) {
-                        // CONTROL_AE_STATE can be null on some devices
-                        Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
-                        if (aeState == null ||
-                                aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
-                            mState = STATE_PICTURE_TAKEN;
-//                            captureStillPicture();
-                        } else {
-//                            runPrecaptureSequence();
-                        }
-                    }
-                    break;
-                }
-                case STATE_WAITING_PRECAPTURE: {
-                    // CONTROL_AE_STATE can be null on some devices
-                    Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
-                    if (aeState == null ||
-                            aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE ||
-                            aeState == CaptureRequest.CONTROL_AE_STATE_FLASH_REQUIRED) {
-                        mState = STATE_WAITING_NON_PRECAPTURE;
-                    }
-                    break;
-                }
-                case STATE_WAITING_NON_PRECAPTURE: {
-                    // CONTROL_AE_STATE can be null on some devices
-                    Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
-                    if (aeState == null || aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
-                        mState = STATE_PICTURE_TAKEN;
-//                        captureStillPicture();
-                    }
-                    break;
-                }*/
             }
         }
 
@@ -601,89 +372,28 @@ public class Camera2BasicFragment extends Fragment
 
     };
 
-    /**
-     * Shows a {@link Toast} on the UI thread.
-     *
-     * @param text The message to show
-     */
-/*    private void showToast(final String text) {
-        final Activity activity = getActivity();
-        if (activity != null) {
-            activity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    Toast.makeText(activity, text, Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-    }
-*/
-    /**
-     * Given {@code choices} of {@code Size}s supported by a camera, choose the smallest one that
-     * is at least as large as the respective texture view size, and that is at most as large as the
-     * respective max size, and whose aspect ratio matches with the specified value. If such size
-     * doesn't exist, choose the largest one that is at most as large as the respective max size,
-     * and whose aspect ratio matches with the specified value.
-     *
-     //     * @param choices           The list of sizes that the camera supports for the intended output
-     *                          class
-     //     * @param textureViewWidth  The width of the texture view relative to sensor coordinate
-     //     * @param textureViewHeight The height of the texture view relative to sensor coordinate
-     //     * @param maxWidth          The maximum width that can be chosen
-     //     * @param maxHeight         The maximum height that can be chosen
-     //     * @param aspectRatio       The aspect ratio
-     * @return The optimal {@code Size}, or an arbitrary one if none were big enough
-     */
-/*    private static Size chooseOptimalSize(Size[] choices, int textureViewWidth,
-            int textureViewHeight, int maxWidth, int maxHeight, Size aspectRatio) {
 
-        // Collect the supported resolutions that are at least as big as the preview Surface
-        List<Size> bigEnough = new ArrayList<>();
-        // Collect the supported resolutions that are smaller than the preview Surface
-        List<Size> notBigEnough = new ArrayList<>();
-        int w = aspectRatio.getWidth();
-        int h = aspectRatio.getHeight();
-        for (Size option : choices) {
-            if (option.getWidth() <= maxWidth && option.getHeight() <= maxHeight &&
-                    option.getHeight() == option.getWidth() * h / w) {
-                if (option.getWidth() >= textureViewWidth &&
-                    option.getHeight() >= textureViewHeight) {
-                    bigEnough.add(option);
-                } else {
-                    notBigEnough.add(option);
-                }
-            }
-        }
-
-        // Pick the smallest of those big enough. If there is no one big enough, pick the
-        // largest of those not big enough.
-        if (bigEnough.size() > 0) {
-            return Collections.min(bigEnough, new CompareSizesByArea());
-        } else if (notBigEnough.size() > 0) {
-            return Collections.max(notBigEnough, new CompareSizesByArea());
-        } else {
-            Log.e(TAG, "Couldn't find any suitable preview size");
-            return choices[0];
-        }
-    }
-*/
     public static Camera2BasicFragment newInstance() {
         return new Camera2BasicFragment();
     }
 
+    /**
+	 * onCreateView - Creates and returns the view hierarchy of the image frame.
+	 * Also converting the bitmap to Mat type for further processing
+     */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
         BitmapFactory.Options opts = new BitmapFactory.Options();
         opts.inPreferredConfig = Bitmap.Config.ARGB_8888; // Each pixel is 4 bytes: Alpha, Red, Green, Blue
-        Bitmap bmpIn = BitmapFactory.decodeResource(getResources(), R.drawable.stones, opts);
+        Bitmap bmpIn = BitmapFactory.decodeResource(getResources(), R.drawable.sample, opts);
         Mat bmp_mat = new Mat();
         Bitmap bmp32 = bmpIn.copy(Bitmap.Config.ARGB_8888, true);
         Utils.bitmapToMat(bmp32, bmp_mat);
         long bmp_mat_addr = bmp_mat.getNativeObjAddr();
 
-        processReferenceImage(bmp_mat_addr);
+        Asuforia(bmp_mat_addr);
 
         globalContext = this;
 
@@ -691,26 +401,33 @@ public class Camera2BasicFragment extends Fragment
 
         LinearLayout surface = view.findViewById(R.id.surface);
 
-        surface.addView(new CustomView(this));
+        surface.addView(new onPose(this, view));
 
         return view;
-
-        //return inflater.inflate(R.layout.fragment_camera2_basic, container, false);
     }
+	
+	/**
+	 * onViewCreated - called after onCreateView has returned and also the saved state is restored in the view.
+     */
 
     @Override
     public void onViewCreated(final View view, Bundle savedInstanceState) {
-        //view.findViewById(R.id.picture).setOnClickListener(this);
-        //view.findViewById(R.id.info).setOnClickListener(this);
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
     }
 
+	/**
+	 * onActivityCreated - called after onCreateView has returned and also the saved state is restored in the view.
+     */
+	
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-//        mFile = new File(getActivity().getExternalFilesDir(null), "pic.jpg");
     }
 
+	
+	/**
+	 * onResume - Called when the activity will start interacting with the user. 
+	 */		
     @Override
     public void onResume() {
         super.onResume();
@@ -727,6 +444,9 @@ public class Camera2BasicFragment extends Fragment
         }
     }
 
+	/**
+	 * onPause - Called when the activity will start interacting with the user. 
+	 */		
     @Override
     public void onPause() {
         closeCamera();
@@ -734,6 +454,9 @@ public class Camera2BasicFragment extends Fragment
         super.onPause();
     }
 
+	/**
+	 * requestCameraPermission - whether we should show UI with rationale for requesting a permission
+	 */	
     private void requestCameraPermission() {
         if (shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
             new ConfirmationDialog().show(getChildFragmentManager(), FRAGMENT_DIALOG);
@@ -742,6 +465,9 @@ public class Camera2BasicFragment extends Fragment
         }
     }
 
+	/**
+	 * onRequestPermissionsResult - Callback for the result from requesting permissions
+	 */	
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
@@ -756,10 +482,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Sets up member variables related to camera.
-     *
-     * @param width  The width of available size for camera preview
-     * @param height The height of available size for camera preview
+     * Sets up member variables related to camera like height, width, rotation of surface etc.
      */
     @SuppressWarnings("SuspiciousNameCombination")
     private void setUpCameraOutputs(int width, int height) {
@@ -836,27 +559,6 @@ public class Camera2BasicFragment extends Fragment
                     maxPreviewHeight = MAX_PREVIEW_HEIGHT;
                 }
 
-                // Danger, W.R.! Attempting to use too large a preview size could  exceed the camera
-                // bus' bandwidth limitation, resulting in gorgeous previews but the storage of
-                // garbage capture data.
-/*                mPreviewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
-                        rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
-                        maxPreviewHeight, largest);
-
-                // We fit the aspect ratio of TextureView to the size of preview we picked.
-                int orientation = getResources().getConfiguration().orientation;
-                if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                    mTextureView.setAspectRatio(
-                            mPreviewSize.getWidth(), mPreviewSize.getHeight());
-                } else {
-                    mTextureView.setAspectRatio(
-                            mPreviewSize.getHeight(), mPreviewSize.getWidth());
-                }
-*/
-                // Check if the flash is supported.
-//                Boolean available = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
-//                mFlashSupported = available == null ? false : available;
-
                 mCameraId = cameraId;
                 return;
             }
@@ -871,7 +573,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Opens the camera specified by {@link Camera2BasicFragment#mCameraId}.
+     * Opens the camera specified by Camera2BasicFragment by checking the permissions, setting up the camera height and width 
      */
     private void openCamera(int width, int height) {
         if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA)
@@ -896,7 +598,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Closes the current {@link CameraDevice}.
+     * Closes the current CameraDevice by locking the camera 
      */
     private void closeCamera() {
         try {
@@ -921,7 +623,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Starts a background thread and its {@link Handler}.
+     * Starts a background thread and attaches its handler 
      */
     private void startBackgroundThread() {
         mBackgroundThread = new HandlerThread("CameraBackground");
@@ -930,7 +632,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Stops the background thread and its {@link Handler}.
+     * Stops the background thread and assigns its respective handler to null.
      */
     private void stopBackgroundThread() {
         mBackgroundThread.quitSafely();
@@ -944,7 +646,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Creates a new {@link CameraCaptureSession} for camera preview.
+     * Creates a new CameraCaptureSession for camera preview.
      */
     private void createCameraPreviewSession() {
         try {
@@ -955,7 +657,7 @@ public class Camera2BasicFragment extends Fragment
             Log.d("PoseEstimate", "createCameraPreviewSession");
 
             // We configure the size of default buffer to be the size of camera preview we want.
-//            texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+			// texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
             texture.setDefaultBufferSize(MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT);
 
             // This is the output Surface we need to start preview.
@@ -986,7 +688,7 @@ public class Camera2BasicFragment extends Fragment
                                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
                                         CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
                                 // Flash is automatically enabled when necessary.
-//                                setAutoFlash(mPreviewRequestBuilder);
+								// setAutoFlash(mPreviewRequestBuilder);
 
                                 // Finally, we start displaying the camera preview.
                                 mPreviewRequest = mPreviewRequestBuilder.build();
@@ -1001,7 +703,6 @@ public class Camera2BasicFragment extends Fragment
                         @Override
                         public void onConfigureFailed(
                                 @NonNull CameraCaptureSession cameraCaptureSession) {
-                            //showToast("Failed");
                         }
                     }, null
             );
@@ -1011,12 +712,9 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Configures the necessary {@link Matrix} transformation to `mTextureView`.
+     * Configures the necessary Matrix transformation to `mTextureView`.
      * This method should be called after the camera preview size is determined in
      * setUpCameraOutputs and also the size of `mTextureView` is fixed.
-     *
-     * @param viewWidth  The width of `mTextureView`
-     * @param viewHeight The height of `mTextureView`
      */
     private void configureTransform(int viewWidth, int viewHeight) {
         Activity activity = getActivity();
@@ -1044,202 +742,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Initiate a still image capture.
-     */
-/*    private void takePicture() {
-        lockFocus();
-    }
-
-    /**
-     * Lock the focus as the first step for a still image capture.
-     */
-/*    private void lockFocus() {
-        try {
-            // This is how to tell the camera to lock focus.
-            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-                    CameraMetadata.CONTROL_AF_TRIGGER_START);
-            // Tell #mCaptureCallback to wait for the lock.
-            mState = STATE_WAITING_LOCK;
-            mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,
-                    mBackgroundHandler);
-        } catch (CameraAccessException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Run the precapture sequence for capturing a still image. This method should be called when
-     * we get a response in {@link #mCaptureCallback} from {@link #lockFocus()}.
-     */
-/*    private void runPrecaptureSequence() {
-        try {
-            // This is how to tell the camera to trigger.
-            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
-                    CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER_START);
-            // Tell #mCaptureCallback to wait for the precapture sequence to be set.
-            mState = STATE_WAITING_PRECAPTURE;
-            mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,
-                    mBackgroundHandler);
-        } catch (CameraAccessException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Capture a still picture. This method should be called when we get a response in
-     * {@link #mCaptureCallback} from both {@link #lockFocus()}.
-     */
-/*    private void captureStillPicture() {
-        try {
-            final Activity activity = getActivity();
-            if (null == activity || null == mCameraDevice) {
-                return;
-            }
-            // This is the CaptureRequest.Builder that we use to take a picture.
-            final CaptureRequest.Builder captureBuilder =
-                    mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-            captureBuilder.addTarget(mImageReader.getSurface());
-
-            // Use the same AE and AF modes as the preview.
-            captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-            setAutoFlash(captureBuilder);
-
-            // Orientation
-            int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
-            captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(rotation));
-
-            CameraCaptureSession.CaptureCallback CaptureCallback
-                    = new CameraCaptureSession.CaptureCallback() {
-
-                @Override
-                public void onCaptureCompleted(@NonNull CameraCaptureSession session,
-                                               @NonNull CaptureRequest request,
-                                               @NonNull TotalCaptureResult result) {
-                    showToast("Saved: " + mFile);
-                    Log.d(TAG, mFile.toString());
-                    unlockFocus();
-                }
-            };
-
-            mCaptureSession.stopRepeating();
-            mCaptureSession.abortCaptures();
-            mCaptureSession.capture(captureBuilder.build(), CaptureCallback, null);
-        } catch (CameraAccessException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Retrieves the JPEG orientation from the specified screen rotation.
-     *
-     * @param rotation The screen rotation.
-     * @return The JPEG orientation (one of 0, 90, 270, and 360)
-     */
-/*    private int getOrientation(int rotation) {
-        // Sensor orientation is 90 for most devices, or 270 for some devices (eg. Nexus 5X)
-        // We have to take that into account and rotate JPEG properly.
-        // For devices with orientation of 90, we simply return our mapping from ORIENTATIONS.
-        // For devices with orientation of 270, we need to rotate the JPEG 180 degrees.
-        return (ORIENTATIONS.get(rotation) + mSensorOrientation + 270) % 360;
-    }
-
-    /**
-     * Unlock the focus. This method should be called when still image capture sequence is
-     * finished.
-     */
-/*    private void unlockFocus() {
-        try {
-            // Reset the auto-focus trigger
-            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-                    CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
-            setAutoFlash(mPreviewRequestBuilder);
-            mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,
-                    mBackgroundHandler);
-            // After this, the camera will go back to the normal state of preview.
-            mState = STATE_PREVIEW;
-            mCaptureSession.setRepeatingRequest(mPreviewRequest, mCaptureCallback,
-                    mBackgroundHandler);
-        } catch (CameraAccessException e) {
-            e.printStackTrace();
-        }
-    }
-
-    @Override
-    public void onClick(View view) {
-        switch (view.getId()) {
-            case R.id.picture: {
-                takePicture();
-                break;
-            }
-            case R.id.info: {
-                Activity activity = getActivity();
-                if (null != activity) {
-                    new AlertDialog.Builder(activity)
-                            .setMessage(R.string.intro_message)
-                            .setPositiveButton(android.R.string.ok, null)
-                            .show();
-                }
-                break;
-            }
-        }
-    }
-
-    private void setAutoFlash(CaptureRequest.Builder requestBuilder) {
-        if (mFlashSupported) {
-            requestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
-                    CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-        }
-    }
-
-    /**
-     * Saves a JPEG {@link Image} into the specified {@link File}.
-     */
-/*    private static class ImageSaver implements Runnable {
-
-        /**
-         * The JPEG image
-         */
-/*        private final Image mImage;
-        /**
-         * The file we save the image into.
-         */
-/*        private final File mFile;
-
-        ImageSaver(Image image, File file) {
-            mImage = image;
-            mFile = file;
-        }
-
-        @Override
-        public void run() {
-            ByteBuffer buffer = mImage.getPlanes()[0].getBuffer();
-            byte[] bytes = new byte[buffer.remaining()];
-            buffer.get(bytes);
-//            Bitmap myBitmap = BitmapFactory.decodeByteArray(bytes,0,bytes.length,null);
-            FileOutputStream output = null;
-            try {
-                output = new FileOutputStream(mFile);
-//                output.write(bytes);
-//                myBitmap.compress(Bitmap.CompressFormat.JPEG, 90, output);
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                mImage.close();
-                if (null != output) {
-                    try {
-                        output.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        }
-
-    }
-
-    /**
-     * Compares two {@code Size}s based on their areas.
+     * Compares two size's based on their areas.
      */
     static class CompareSizesByArea implements Comparator<Size> {
 
@@ -1253,7 +756,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Shows an error message dialog.
+     * Shows an error message dialog by using ErrorDialog and onCreateDialog
      */
     public static class ErrorDialog extends DialogFragment {
 
@@ -1316,16 +819,18 @@ public class Camera2BasicFragment extends Fragment
         }
     }
 
-    //public native String nativePoseEstimation(int jHeight, int jWidth, Image jtempImage);
+    private static native String Asuforia(long bmp_addr);
 
-    //private static native String nativePoseEstimation(int srcWidth, int srcHeight, ByteBuffer srcBuf,
-                                                      //Surface dst, String path, long bmp_addr);
-    private static native String processReferenceImage(long bmp_addr);
-
-    private static native String processCamera2Frames(int srcWidth, int srcHeight, ByteBuffer srcBuf, Surface dst, String path, long tempAddr);
+    private static native String nativePoseEstimation(int srcWidth, int srcHeight, ByteBuffer srcBuf, Surface dst, String path, long tempAddr);
 }
 
-class CustomView extends SurfaceView implements SurfaceHolder.Callback{
+	/**
+     * onPose - Creating a view class that acts lika built-in view with custom attributes and support from layout editor.
+	 * Defining the constructor as per our requirements
+	 * OnTouchEvent - used for displaying the cube on every touch made by the user	
+     */
+
+class onPose extends SurfaceView implements SurfaceHolder.Callback{
 
     private final Paint paint;
     private final SurfaceHolder mHolder;
@@ -1339,56 +844,39 @@ class CustomView extends SurfaceView implements SurfaceHolder.Callback{
     static double[] point7 = new double[2];
     static double[] point8 = new double[2];
 
+    static View view;
 
-    public CustomView(Camera2BasicFragment context) {
+
+    public onPose(Camera2BasicFragment context, View view_t) {
         super(context.getActivity().getBaseContext());
-        Log.d("CustomView", "customview");
+        view = view_t;
+        Log.d("onPose", "onPose");
         mHolder = getHolder();
         setZOrderOnTop(true);
         mHolder.setFormat(PixelFormat.TRANSPARENT);
-        //mHolder.setFormat(PixelFormat.formatHasAlpha(100));
-        //Log.d("ALPHA", "bool: "+PixelFormat.formatHasAlpha(PixelFormat.TRANSPARENT));
         PixelFormat.formatHasAlpha(PixelFormat.TRANSPARENT);
-        //mHolder.setFormat(PixelFormat.TRANSLUCENT);
 
         this.context = context.getActivity().getBaseContext();
         paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(Color.RED);
         paint.setStyle(Paint.Style.STROKE);
-        //setZOrderMediaOverlay(true);
 
-        //Calib3d.projectPoints()
-
-        if(getHolder().getSurface() != null){
+        if(getHolder().getSurface().isValid()){
             Log.d("Surface", "true");
+            Canvas canvas = mHolder.lockCanvas();
+            if(canvas != null) {
+                canvas.drawColor(Color.TRANSPARENT);
+                Paint paint = new Paint();
+                paint.setColor(Color.BLUE);
+                paint.setStrokeWidth(10f);
+                canvas.drawLine(1000, 1200, 500, 700, paint);
+                mHolder.unlockCanvasAndPost(canvas);
+            }
         }
-
-        /*
-        //if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            //invalidate();
-            if (mHolder.getSurface().isValid()) {
-                Canvas canvas = mHolder.lockCanvas();
-                Log.d("touch", "touchRecieved by camera");
-                //if (canvas != null) {
-                    Log.d("touch", "touchRecieved CANVAS STILL Not Null");
-                    //canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-                    canvas.drawColor(Color.TRANSPARENT);
-                    canvas.drawCircle(1000, 500, 100, paint);
-                    //canvas.drawLine();
-                    Paint paint = new Paint();
-
-
-                    mHolder.unlockCanvasAndPost(canvas);
-                //}
-                //mHolder.unlockCanvasAndPost(canvas);
-
-
-            //}
-        }*/
 
     }
 
-    public CustomView(Camera2BasicFragment context, double[] origin, double[] x, double[] y, double[] z, double[] diagonal_xy,
+    public onPose(Camera2BasicFragment context, double[] origin, double[] x, double[] y, double[] z, double[] diagonal_xy,
                       double[] x_3d, double[] y_3d, double[] diagonal_3d) {
         super(context.getActivity().getBaseContext());
         point1 = origin;
@@ -1399,59 +887,18 @@ class CustomView extends SurfaceView implements SurfaceHolder.Callback{
         point6 = x_3d;
         point7 = y_3d;
         point8 = diagonal_3d;
-        //Log.d("PointsInside", "p1: "+point1[0]+" "+point1[1]);
-        Log.d("CustomView", "customview");
+        Log.d("onPose", "onPose");
         mHolder = getHolder();
         setZOrderOnTop(true);
         mHolder.setFormat(PixelFormat.TRANSPARENT);
-        //mHolder.setFormat(PixelFormat.formatHasAlpha(100));
-        //Log.d("ALPHA", "bool: "+PixelFormat.formatHasAlpha(PixelFormat.TRANSPARENT));
         PixelFormat.formatHasAlpha(PixelFormat.TRANSPARENT);
-        //mHolder.setFormat(PixelFormat.TRANSLUCENT);
 
         this.context = context.getActivity().getBaseContext();
         paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(Color.RED);
         Log.d("PaintColor", "color1 "+paint.getColor());
         paint.setStyle(Paint.Style.STROKE);
-        //setZOrderMediaOverlay(true);
-
-        //Calib3d.projectPoints()
-
-        if(getHolder().getSurface().isValid()){
-            Log.d("Surface", "true");
-        }
-
-        /*
-        //if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            //invalidate();
-            if (mHolder.getSurface().isValid()) {
-                Canvas canvas = mHolder.lockCanvas();
-                Log.d("touch", "touchRecieved by camera");
-                //if (canvas != null) {
-                    Log.d("touch", "touchRecieved CANVAS STILL Not Null");
-                    //canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-                    canvas.drawColor(Color.TRANSPARENT);
-                    canvas.drawCircle(1000, 500, 100, paint);
-                    //canvas.drawLine();
-                    Paint paint = new Paint();
-
-
-                    mHolder.unlockCanvasAndPost(canvas);
-                //}
-                //mHolder.unlockCanvasAndPost(canvas);
-
-
-            //}
-        }*/
-
     }
-/*
-    @Override
-    protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas);
-    }
-*/
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -1464,28 +911,12 @@ class CustomView extends SurfaceView implements SurfaceHolder.Callback{
                     Log.d("touch", "touchRecieved CANVAS STILL Not Null");
                     canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
                     canvas.drawColor(Color.TRANSPARENT);
-                    //canvas.drawCircle(event.getX(), event.getY(), 100, paint);
                     Paint paint = new Paint();
                     paint.setColor(Color.BLUE);
                     paint.setStrokeWidth(10f);
 
-
-
-                    //point1[0] = 1; point1[1] = 2;
-                    Log.d("Points", "p1: "+point1[0]+" "+point1[1]);
-                    //Log.d("PointsFloat", "p1: "+(float)point1[0]+" "+(float)point1[1]);
-                    /*
-                    if (point1 == null) {
-                        Log.d("Points", "point1: null");
-
-                    }
-                    if (point2 == null) {
-                        Log.d("Points", "point2: null");
-
-                    }
-                    */
-                    //if(point1 != null && point2!=null) {
-                        canvas.drawLine((float) point1[0], (float) point1[1], (float) point2[0], (float) point2[1], paint);
+                    //Draw Cube
+                    canvas.drawLine((float) point1[0], (float) point1[1], (float) point2[0], (float) point2[1], paint);
                     canvas.drawLine((float) point2[0], (float) point2[1], (float) point5[0], (float) point5[1], paint);
                     canvas.drawLine((float) point5[0], (float) point5[1], (float) point3[0], (float) point3[1], paint);
                     canvas.drawLine((float) point3[0], (float) point3[1], (float) point1[0], (float) point1[1], paint);
@@ -1497,39 +928,10 @@ class CustomView extends SurfaceView implements SurfaceHolder.Callback{
                     canvas.drawLine((float) point1[0], (float) point1[1], (float) point4[0], (float) point4[1], paint);
                     canvas.drawLine((float) point2[0], (float) point2[1], (float) point6[0], (float) point6[1], paint);
                     canvas.drawLine((float) point5[0], (float) point5[1], (float) point8[0], (float) point8[1], paint);
-/*
-                    canvas.drawLine((float) point1[0], (float) point2[0], (float) point1[1], (float) point2[1], paint);
-                    canvas.drawLine((float) point2[0], (float) point5[0], (float) point2[1], (float) point5[1], paint);
-                    canvas.drawLine((float) point5[0], (float) point3[0], (float) point5[1], (float) point3[1], paint);
-                    canvas.drawLine((float) point3[0], (float) point1[0], (float) point3[1], (float) point1[1], paint);
-                    canvas.drawLine((float) point4[0], (float) point6[0], (float) point4[1], (float) point6[1], paint);
-                    canvas.drawLine((float) point6[0], (float) point8[0], (float) point6[1], (float) point8[1], paint);
-                    canvas.drawLine((float) point8[0], (float) point7[0], (float) point8[1], (float) point7[1], paint);
-                    canvas.drawLine((float) point7[0], (float) point4[0], (float) point7[1], (float) point4[1], paint);
-                    canvas.drawLine((float) point3[0], (float) point7[0], (float) point3[1], (float) point7[1], paint);
-                    canvas.drawLine((float) point1[0], (float) point4[0], (float) point1[1], (float) point4[1], paint);
-                    canvas.drawLine((float) point2[0], (float) point6[0], (float) point2[1], (float) point6[1], paint);
-                    canvas.drawLine((float) point5[0], (float) point8[0], (float) point5[1], (float) point8[1], paint);
-*/
-                    //}
 
                     mHolder.unlockCanvasAndPost(canvas);
-/*
-                    new Handler().postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            Canvas canvas1 = mHolder.lockCanvas();
-                            if(canvas1 !=null){
-                                canvas1.drawColor(0, PorterDuff.Mode.CLEAR);
-                                mHolder.unlockCanvasAndPost(canvas1);
-                            }
 
-                        }
-                    }, 1000);
-*/
                 }
-                //mHolder.unlockCanvasAndPost(canvas);
-
 
             }
         }
@@ -1540,9 +942,7 @@ class CustomView extends SurfaceView implements SurfaceHolder.Callback{
 
     @Override
     public void surfaceCreated(SurfaceHolder surfaceHolder) {
-        if((getHolder().lockCanvas() != null)){
-            Log.d("Canvas", "true");
-        }
+
     }
 
     @Override
