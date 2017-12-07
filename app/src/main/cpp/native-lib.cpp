@@ -15,9 +15,13 @@
 #include <opencv2/core/utility.hpp>
 #include <opencv2/highgui.hpp>
 
-
-
 #define BILLION 1000000000L
+
+/** 
+ * native-lib.cpp - implements the opencv functions for pose estimation
+ * contains the function for getting the keypoints and descriptors for reference image
+ * also contains the processing of input frames i.e. doing pose estimation 
+*/
 
 using namespace cv;
 using namespace std;
@@ -29,6 +33,10 @@ Mat _R_matrix;
 Mat _A_matrix;
 Mat _t_matrix;
 Mat _P_matrix;
+
+/** 
+ * pnpProblem - converts the input 3d projected points to 2d coordinate system - to be used in the processing of input frames
+*/
 
 class pnpProblem{
 
@@ -55,49 +63,28 @@ public:
     }
 };
 
+
+
 extern "C" {
 
-JNIEXPORT jstring JNICALL
-/*
-Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_Camera2BasicFragment_nativePoseEstimation(
-        JNIEnv *env, jobject instance,
-        jint jHeight, jint jWidth, jobject srcBuffer, jobject dstSurface, jstring path, jlong bmp_mat_addr) {
+/** 
+ * Defines the function for processing the reference image i.e. getting the keypoints and descriptors for the reference image
+ * bmp_mat_addr - contains the Mat of the reference image bitmap values
 */
-Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_Camera2BasicFragment_processReferenceImage(
+JNIEXPORT jstring JNICALL
+Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_Camera2BasicFragment_Asuforia(
         JNIEnv *env, jobject instance,
         jlong bmp_mat_addr) {
 
     std::string hello = "Hello from C++";
 
     int printInt = 10;
-//    __android_log_print(ANDROID_LOG_INFO, "Pixels", "pixels[]= %d", printInt);
-
-    //uint8_t *srcLumaPtr = reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(srcBuffer));
-
-    //Mat mYuv(jHeight + jHeight / 2, jWidth, CV_8UC1, srcLumaPtr);
-
-    //__android_log_print(ANDROID_LOG_INFO, "YUV Mat", "Mat= %s", mYuv);
 
     Mat *bitmapImage = (Mat *) bmp_mat_addr;
     Mat img_in = bitmapImage->clone();
 
-    bool end_registration = false;
-
-
-// Setup the points to register in the image
-// In the order of the *.ply file and starting at 1
-    int n = 8;
-    int pts[] = {1, 2, 3, 4, 5, 6, 7, 8}; // 3 -> 4
-
-
-
-    int numKeyPoints = 10000;
-
-//computation of key points and descriptors for the ref Image
+	//computation of key points and descriptors for the ref Image
     vector<KeyPoint> keypoints_model;
-    Mat descriptors_model;
-
-
 
     // BruteFroce matcher with Norm Hamming is the default matcher
 
@@ -111,7 +98,6 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
 
     __android_log_print(ANDROID_LOG_INFO, "Key points size", "size= %d", keypoints_model.size());
 
-    vector<Point3f> list_points3d_model;
     for (int i = 0; i < keypoints_model.size(); i++) {
         global_list_points3d_model.push_back(
                 Point3d(keypoints_model[i].pt.x, keypoints_model[i].pt.y, 0.0f));
@@ -123,14 +109,26 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
 }
 
 
+/** 
+ * Defines the function for processing the camera2 frames i.e. the camera feed from the device. 
+ * We get the keypoints and descriptors of the camera2 frames.
+ * These keypoints and descriptors will be matched with the reference image keypoints and descriptors using knnMatch function.
+ * knnMatch function will return the number of good matches between the reference image and the current input frame
+ * Once the matches are finalised we convert them to 2d model to be used for pnp function
+ * Call solvePnPRansac for getting the pose estimation of the cube to be drawn
+ * variables
+ * Width - Width of frame
+ * Height - Height of frame
+ * srcBuffer - For YUV matrix, it is plane[0] starting address
+ * point2fAddr - used for pose estimation matrix
+ */
 JNIEXPORT jstring JNICALL
-Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_Camera2BasicFragment_processCamera2Frames(
+Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_Camera2BasicFragment_nativePoseEstimation(
         JNIEnv *env, jclass type, jint jWidth, jint jHeight, jobject srcBuffer, jobject dst,
         jstring path_, jlong point2fAddr) {
     const char *path = env->GetStringUTFChars(path_, 0);
 
     std::string returnValue = "hello";
-    // TODO
 
     //Compute code execution time
     struct timeval start, end;
@@ -141,27 +139,11 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
     //Computation of key points and descriptors for the frame
     vector<KeyPoint> keypoints_frame;
     cv::Ptr<cv::FeatureDetector> detector_;
-    detector_ = cv::ORB::create(100);
+    detector_ = cv::ORB::create();
 
     uint8_t *srcLumaPtr = reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(srcBuffer));
 
     Mat mYuv(jHeight + jHeight / 2, jWidth, CV_8UC1, srcLumaPtr);
-
-    //Mat& mYuvTemp =  *(Mat*) mYuvAddr;
-    //mYuvTemp = mYuv;
-  //  Mat mYuv;
-/*
-    int x=0;
-    for(int i=0; i<=jHeight; i+2) {
-        mYuv.row(x) = mYuv_temp.row(i);
-        x++;
-    }
-    x=0;
-    for(int i=0; i<=jWidth; i+2) {
-        mYuv.col(x) = mYuv.col(i);
-        x++;
-    }
-*/
 
     gettimeofday(&start, NULL);
     detector_->detect(mYuv, keypoints_frame);
@@ -182,8 +164,14 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
     elapsed_time = ((end.tv_sec * 1000) + (end.tv_usec / 1000))-((start.tv_sec * 1000) + (start.tv_usec / 1000));
     __android_log_print(ANDROID_LOG_INFO, "FrameTime", "extractor: %lld", elapsed_time);
 
-// getting good matches between refImage and Input Frame
-    cv::Ptr<cv::DescriptorMatcher> matcher_;
+    Ptr<flann::IndexParams> indexParams = makePtr<flann::LshIndexParams>(6, 12, 1); // instantiate LSH index parameters
+    Ptr<flann::SearchParams> searchParams = makePtr<flann::SearchParams>(50);       // instantiate flann search parameters
+
+    Ptr<DescriptorMatcher> matcher_ = makePtr<FlannBasedMatcher>(indexParams, searchParams);
+
+
+	// getting good matches between refImage and Input Frame
+    
     matcher_ = cv::makePtr<cv::BFMatcher>((int)cv::NORM_HAMMING, false);
 
     std::vector<std::vector<cv::DMatch> > matches;
@@ -263,8 +251,8 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
 
 
     int pnpMethod = SOLVEPNP_ITERATIVE;
-// RANSAC parameters
-    int iterationsCount = 500;      // number of Ransac iterations.
+	// RANSAC parameters
+    int iterationsCount = 500;     // number of Ransac iterations.
     float reprojectionError = 2.0;  // maximum allowed distance to consider it an inlier.
     double confidence = 0.95;        // ransac successful confidence.
     Mat inliers;
@@ -273,9 +261,6 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
         cv::solvePnPRansac( list_points3d_model_match, list_points2d_scene_match, _A_matrix, distCoeffs, rvec, tvec,
                             useExtrinsicGuess, iterationsCount, reprojectionError, confidence,
                             inliers, pnpMethod );
-        //cv::solvePnP(list_points3d_model_match, list_points2d_scene_match, _A_matrix, distCoeffs,
-        //             rvec, tvec,
-        //             useExtrinsicGuess, pnpMethod);
 
         Rodrigues(rvec, _R_matrix);      // converts Rotation Vector to Matrix
         _t_matrix = tvec;       // set translation matrix
@@ -295,12 +280,9 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
         _P_matrix.at<double>(1, 3) = _t_matrix.at<double>(1);
         _P_matrix.at<double>(2, 3) = _t_matrix.at<double>(2);
 
-        //Mat &pMatrix = *(Mat *) PMatrixAddr;
-        //pMatrix = _P_matrix;
-
         __android_log_print(ANDROID_LOG_INFO, "PFrame", "rows: %f", _P_matrix.at<double>(2, 0));
 
-        float l = 200;
+        float l = 100;
 
         Mat &pose_pointsMat_temp = *(Mat *) point2fAddr;
 
@@ -326,10 +308,7 @@ Java_com_example_srinathd_eee598_1poseestimation_1sakalabattula_1konda_1dasari_C
         __android_log_print(ANDROID_LOG_INFO, "Good_Matches", "size %d",good_matches.size());
     }
 
-    //__android_log_print(ANDROID_LOG_INFO, "pose_points2d", "size %d",pose_pointsMat_temp.size);
-
     return env->NewStringUTF(returnValue.c_str());
-    //return posePoints;
 }
 
 }
