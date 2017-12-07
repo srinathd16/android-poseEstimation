@@ -3,7 +3,7 @@ Project Title:
 Pose Estimation - eee598-poseestimation-sakalabattula-konda-dasari
 
 Prerequisites
-  - Add the following paths in your CMAakeLists file
+  - Add the following paths in your CMakeLists file
     set(pathToProject /project path/)
     set(pathToOpenCv /OpenCVpath/)
   
