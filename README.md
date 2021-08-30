@@ -1,19 +1,14 @@
-# eee598-poseestimation-sakalabattula-konda-dasari
-Project Title:
-Pose Estimation - eee598-poseestimation-sakalabattula-konda-dasari
+# Android Pose Estimation
 
-Prerequisites
-  - Add the following paths in your CMakeLists file
-    set(pathToProject /project path/)
-    set(pathToOpenCv /OpenCVpath/)
-  
-  Name of the app
-    -eee598-poseestimation-sakalabattula-konda-dasari
-  
-  How to use the app
-    -Post installation of the app for the cube to be displayed we need to touch on the display screen multiple times since we used onTouch function as part of our onPose function.
-    
-   Expected Output
-    -Cube will be displayed sporadically and the size of the cube is also distorted.
+* Prerequisites
+  * Add the following paths in your CMakeLists file:  
+     set(pathToProject /project path/)  
+     set(pathToOpenCv /OpenCVpath/)
+
+* How to use the app
+  * Post installing the app, for the cube to be displayed, to tap on the screen multiple times. This is because, the trigger for the onPose function has been implemented via an onTouch function of the activity screen.
+
+* Expected Output
+  * Cube will be displayed sporadically with the size of the cube being distorted.
   
   
