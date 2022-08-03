@@ -1,4 +1,5 @@
-# Android Pose Estimation
+# Pose Estimation
+### _Android App Demonstration_
 
 * Prerequisites
   * Add the following paths in your CMakeLists file:  
@@ -6,9 +7,7 @@
      set(pathToOpenCv /OpenCVpath/)
 
 * How to use the app
-  * Post installing the app, for the cube to be displayed, to tap on the screen multiple times. This is because, the trigger for the onPose function has been implemented via an onTouch function of the activity screen.
-
-* Expected Output
-  * Cube will be displayed sporadically with the size of the cube being distorted.
+  * Install the app. For the cube to be displayed, tap on the screen multiple times to  trigger the onTouch functionionality of the activity screen which calls the onPose function.
   
-  
+* Implementation Technologies
+  * Java, OpenCV
