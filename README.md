@@ -7,7 +7,8 @@
      set(pathToOpenCv /OpenCVpath/)
 
 * How to use the app
-  * Install the app. For the cube to be displayed, tap on the screen multiple times to  trigger the onTouch functionionality of the activity screen which calls the onPose function.
+  * Install the app. Tapping on the screen multiple times displays a Cube.
+    * Multiple taps on the screen trigger the onTouch functionionality of the activity screen which further calls the onPose function.
   
 * Implementation Technologies
   * Java, OpenCV
