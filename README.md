@@ -10,5 +10,5 @@
   * Install the app. Tapping on the screen multiple times displays a Cube.
     * Multiple taps on the screen trigger the onTouch functionionality of the activity screen which further calls the onPose function.
   
-* Implementation Technologies
+* Implementation Languages
   * Java, OpenCV
